@@ -1,4 +1,4 @@
-{% extends "bootstrap/base.html" %}
+{% extends "base.html" %}
 
 {% block title %}Index{% endblock %}
 {% block head %}
@@ -6,6 +6,13 @@
     <style>
     </style>
 {% endblock %}
-{% block body %}
-<h1>Hello, World!</h1>
+
+{% block page_content %}
+<div class="page-header"></div>
+    <h1>Hello, World!</h1>
+</div>
+
+<p>The local date and time is {{ moment(current_time).format('LLL') }}.</p>
+<p>That was {{ moment(current_time).fromNow(refresh=True) }}</p>
 {% endblock %}
+
