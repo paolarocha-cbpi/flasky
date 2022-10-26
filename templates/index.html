@@ -9,8 +9,13 @@
 {% endblock %}
 
 {% block page_content %}
-<div class="page-header"></div>
+<div class="page-header">
     <h1>Hello, {% if name %}{{ name }}{% else %}Stranger{% endif %}!</h1>
+    {% if not known %}
+    <p>Pleased to meet you!</p>
+    {% else %}
+    <p>Happy to see you again!</p>
+    {% endif %}
 </div>
 
 <p>The local date and time is {{ moment(current_time).format('LLL') }}.</p>
@@ -22,7 +27,7 @@
     {{ form.hidden_tag() }}
     {{ form.name.label }} {{ form.name(id='my-text-field') }}
     {{ form.submit() }}
-    </form>
+</form>
 
 {% endblock %}
 
