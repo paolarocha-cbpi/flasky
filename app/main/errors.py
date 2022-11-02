@@ -1,3 +1,4 @@
+"""Here goes the error handlers"""
 from flask import render_template
 from . import main
 
