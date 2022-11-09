@@ -23,22 +23,22 @@ En el archivo requirements.txt se encuentran las librerías y paquetes necesario
 ```
 Con el siguiente comando se puede ejecutar la aplicación en modo debug
 ```bash
-(venv) $ flask --app hello --debug run
+(venv) $ flask --app flasky --debug run
 ```
 
 ## Migraciones a la base de datos
 
 Para crear migraciones, se utiliza primero el comando `init`:
 ```bash
-(venv)  $ flask --app hello db init
+(venv)  $ flask --app flasky db init
 ```
 Este último comando creará la carpeta `migrations` donde se encuentran los scripts de de las migraciones. 
 
 Para crear de manera automática un script de migración:
 ```bash
-(venv) $ flask --app hello db migrate -m "initial migration"
+(venv) $ flask --app flasky db migrate -m "initial migration"
 ```
 Una vez que el script ha sido revisado y aceptado, se pueden aplicar los cambios con:
 ```bash
-(venv) $ flask --app hello db upgrade
+(venv) $ flask --app flasky db upgrade
 ```

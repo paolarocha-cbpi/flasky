@@ -273,3 +273,101 @@ def validation_error(e):
 ```
 - La función decorada será invocada cada vez que se lance una excepción de la clase dada. Tener en cuenta que el decorador se obtiene del blueprint de la API, por lo que este manejador se invocará sólo cuando la ruta del blueprint sea manejada.
 
+### Implementación de endpoints de recursos
+Manejadores de recursos `GET` para los posts:
+
+```python
+# app/api/posts.py
+from flask import jsonify, request, url_for
+from ..models import Post
+from . import api
+
+@api.route('/posts/')
+def get_posts():
+    posts = Post.query.all()
+    return jsonify({
+        'posts': [post.to_json() for post in posts]
+    })
+
+@api.route('/posts/<int:id>')
+def get_post(id):
+    post = Post.query.get_or_404(id)
+    return jsonify(post.to_json())
+```
+- La primera ruta maneja la solicitud de colección de posts.
+- La segunda ruta devuelve una sola entrada del blog y responde con un error de código 404 cuando el `id` dado no se encuentra en la base de datos.
+
+Manejador de recursos `POST` para los posts:
+```python
+# app/api/posts.py
+@api.route('/posts/', methods=['POST'])
+@permission_required(Permission.WRITE)
+def new_post():
+    post = Post.from_json(request.json)
+    post.author = g.current_user
+    db.session.add(post)
+    db.session.commit()
+    return jsonify(post.to_json()), 201, \
+        {'Location': url_for('api.get_post', id=post.id)}
+```
+- `permission_required`: garantiza que el usuario autentificado tiene permiso para escribir entradas en el blog.
+- Se crea un blog a partir de los datos JSON y su autor se asigna explícitamente como usuario autentificado
+- Se devuelve un código de estado 201 y se añade una cabecera `Location` con la URL del recurso recién creado.
+
+Implementación del decorador `permission_required`:
+```python
+# app/api/decorators.py
+from functools import wraps
+from flask import g
+from .errors import forbidden
+
+def permission_required(permission):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not g.current_user.can(permission):
+                return forbidden('Insufficient permissions')
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+```
+Manejador de recursos `PUT` para los posts:
+```python
+# app/api/posts.py
+@api.route('/posts/<int:id>', methods=['PUT'])
+@permission_required(Permission.WRITE)
+def edit_post(id):
+    post = Post.query.get_or_404(id)
+    if g.current_user != post.author and \
+            not g.current_user.can(Permission.ADMIN):
+        return forbidden('Insufficient permissions')
+    post.body = request.json.get('body', post.body)
+    db.session.add(post)
+    db.session.commit()
+    return jsonify(post.to_json())
+```
+- Para permitir que un usuario edite una entrada del blog, la función también debe garantizar que el usuario es el autor de la entrada o bien es un administrador
+
+### Pruebas de servicios web con HTTPie
+Los dos clientes más utilizados para probar los servicios web de Python desde la línea de comandos son cURL y HTTPie:
+```bash
+(venv) $ pip install httpie
+```
+Suponiendo que el servidor de desarrollo se está ejecutando en la dirección por defecto http://127.0.0.1:5000
+se puede realizar una petición `GET` desde otra ventana de terminal de la siguiente manera:
+```bash
+(venv) $ http --json --auth <email>:<password> GET \
+> http://127.0.0.1:5000/api/v1/posts
+```
+El siguiente comando envía una petición `POST` para añadir una nueva entrada en el blog:
+```bash
+(venv) $ http --auth <email>:<password> --json POST \
+> http://127.0.0.1:5000/api/v1/posts/ \
+> "body=I'm adding a post from the *command line*."
+```
+Para utilizar tokens de autenticación en lugar de un nombre de usuario y una contraseña, se envía primero una solicitud `POST`
+a */api/v1/tokens/*:
+```bash
+(venv) $ http --auth <email>:<password> --json POST \
+> http://127.0.0.1:5000/api/v1/tokens/
+```
