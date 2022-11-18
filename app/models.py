@@ -203,6 +203,7 @@ class User(UserMixin, db.Model):
     def ping(self):
         self.last_seen = datetime.utcnow()
         db.session.add(self)
+        db.session.commit()
 
     def gravatar_hash(self):
         return hashlib.md5(self.email.lower().encode('utf-8')).hexdigest()
