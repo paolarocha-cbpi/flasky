@@ -164,6 +164,50 @@ class EditProfileAdminForm(FlaskForm):
                 User.query.filter_by(username=field.data).first():
             raise ValidationError('Username already in use.')
 ```
+- `SelectField` de WTForm implementa una lista de opciones para seleccionar el rol del usuario.
+- Una instancia de `SelectField` se determinan con el atributo `choices`. Estos se dan en forma de dos valores: un idenfiticador y el texto a mostrar como string.
+- Los valores de la lista se obtienen del modelo `Role`.
+- El argumento `coerce=int` para que los valores se guarden como enteros en lugar de strings.
 
+La función de vista para editar el perfil del administrador:
 
+```python
+# app/main/views.py
+@main.route('/edit-profile/<int:id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_profile_admin(id):
+    user = User.query.get_or_404(id)
+    form = EditProfileAdminForm(user=user)
+    if form.validate_on_submit():
+        user.email = form.email.data
+        user.username = form.username.data
+        user.confirmed = form.confirmed.data
+        user.role = Role.query.get(form.role.data)
+        user.name = form.name.data
+        user.location = form.location.data
+        user.about_me = form.about_me.data
+        db.session.add(user)
+        db.session.commit()
+        flash('The profile has been updated.')
+        return redirect(url_for('.user', username=user.username))
+    form.email.data = user.email
+    form.username.data = user.username
+    form.confirmed.data = user.confirmed
+    form.role.data = user.role_id
+    form.name.data = user.name
+    form.location.data = user.location
+    form.about_me.data = user.about_me
+    return render_template('edit_profile.html', form=form, user=user)
+```
+- Emplea el decorador `admin_required`.
+- Cuando el formulario se envia, el `id` se extrae del atributo de datos del campo y se utiliza en una consulta para cargar el objeto de rol seleccionado por su `id` una vez más.
 
+Añadiendo el botón para editar perfil de administrador:
+
+```html
+<!-- app/templates/user.html -->
+{% if current_user.is_administrator() %}
+<a class="btn btn-danger" href="{{ url_for('.edit_profile_admin', id=user.id) }}">Edit Profile [Admin]</a>
+{% endif %}
+```
