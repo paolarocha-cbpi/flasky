@@ -101,10 +101,10 @@ class User(UserMixin, db.Model):
                             lazy='dynamic',
                             cascade='all, delete-orphan')
     followers = db.relationship('Follow',
-                                foreign_keys=[Follow.followed_id],
-                                backref=db.backref('followed', lazy='joined'),
-                                lazy='dynamic',
-                                cascade='all, delete-orphan')
+                            foreign_keys=[Follow.followed_id],
+                            backref=db.backref('followed', lazy='joined'),
+                            lazy='dynamic',
+                            cascade='all, delete-orphan')
     comments = db.relationship('Comment', backref='author', lazy='dynamic')
 
     @staticmethod
