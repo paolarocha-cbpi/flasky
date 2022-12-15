@@ -193,8 +193,3 @@ def moderate_disable(id):
 ```
 - Las rutas de activación y desactivación  cargan el objeto de comentario, establecen el campo `disabled` en el valor adecuado y lo vuelven a escribir en la base de datos.
 - Se redirigen de nuevo a la página de moderación de comentarios
-
-
-
-
-
