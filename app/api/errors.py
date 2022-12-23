@@ -1,9 +1,8 @@
 from flask import jsonify
 from . import api
 from flask import render_template, request, jsonify
-# from . import main
+#from . import main
 from app.exceptions import ValidationError
-from . import api
 
 def bad_request(message):
     response = jsonify({'error': 'bad request', 'message': message})
