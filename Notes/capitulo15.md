@@ -70,3 +70,15 @@ Para correr las pruebas:
 (venv) $ flask --app flasky test --coverage
 ```
 
+## El cliente de pruebas de Flask
+
+Algunas partes del código de la aplicación dependen en gran medida del entorno creado por una aplicación en ejecución, esto es que las funciones de vista sólo pueden ejecutarse en el contexto de una solicitud y una aplicación en ejecución.
+
+El cliente de pruebas reproduce el entorno que existe cuando una aplicación se ejecuta dentro de un servidor web, permitiendo que las pruebas actúen como clientes y envíen peticiones.
+
+### Probando aplicaciones web
+
+
+
+
+
