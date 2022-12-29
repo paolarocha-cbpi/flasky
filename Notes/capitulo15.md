@@ -78,6 +78,188 @@ El cliente de pruebas reproduce el entorno que existe cuando una aplicación se 
 
 ### Probando aplicaciones web
 
+```python
+# tests/test_client.py
+import unittest
+from app import create_app, db 
+from app.models import User, Role
+
+class FlaskClientTestCase(unittest.TestCase):
+    def setUp(self):
+        self.app = create_app('testing')
+        self.app_context = self.app.app_context()
+        self.app_context.push()
+        db.create_all()
+        Role.insert_roles()
+        self.client = self.app.test_client(use_cookies=True)
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        self.app_context.pop()
+
+    def test_home_page(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue('Stranger' in response.get_data(as_text=True))
+```
+- Se añade una variable de instancia `self.client`, que es el objeto cliente de prueba de Flask.
+- Con la opción `use_cookies` activada, se aceptará y enviará cookies de la misma forma que lo hacen los navegadores, por lo que se pueden utilizar funcionalidades que dependen de las cookies para recordar el contexto entre peticiones, como son el uso de sesiones de usuario.
+
+Para evitar la molestia de tratar con tokens CSRF en las pruebas, es mejor desactivar la protección CSRF en la configuración de las pruebas:
+
+```python
+# config.py
+class TestingConfig(Config): #...
+    WTF_CSRF_ENABLED = False
+```
+
+Prueba unitaria más elaborada:
+```python
+# tests/test_client.py
+class FlaskClientTestCase(unittest.TestCase):
+    # ...
+    def test_register_and_login(self):
+        # register a new account
+        response = self.client.post('/auth/register', data={
+            'email': 'john@example.com',
+            'username': 'john',
+            'password': 'cat',
+            'password2': 'cat'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # login with the new account
+        response = self.client.post('/auth/login', data={
+            'email': 'john@example.com',
+            'password': 'cat'
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(re.search('Hello,\s+john!',
+                                    response.get_data(as_text=True)))
+        self.assertTrue(
+            'You have not confirmed your account yet' in response.get_data(
+                as_text=True))
+
+        # send a confirmation token
+        user = User.query.filter_by(email='john@example.com').first()
+        token = user.generate_confirmation_token()
+        response = self.client.get('/auth/confirm/{}'.format(token),
+                                    follow_redirects=True)
+        user.confirm(token)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            'You have confirmed your account' in response.get_data(
+                as_text=True))
+
+        # log out
+        response = self.client.get('/auth/logout', follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue('You have been logged out' in response.get_data(
+            as_text=True))
+```
+- El argumento `data` de `post()` es un diccionario con los campos del formulario, que deben coincidir exactamente con los nombres de campo definidos en el formulario HTML.
+- Si los datos de registro son válidos, una redirección envía al usuario a la página de login. Para validar esto, la prueba comprueba que el código de estado de la respuesta es 302, que es el código de una redirección.
+- Para la prueba de inicio de sesión a la aplicación se utiliza el correo electrónico y la contraseña que se acaban de registrar. Con una petición `POST` a la ruta `/auth/login`, esta vez con el argumento `follow_redirects=True` para hacer que el cliente de prueba funcione como un navegador y emita automáticamente una petición `GET` para la URL redirigida. 
+    - Con esta opción, no se devolverá el código de estado 302; en su lugar, se devuelve la respuesta de la URL redirigida.
+    - Una búsqueda de la cadena 'Hello, john!' no funcionaría porque esta cadena se ensambla a partir de porciones estáticas y dinámicas. Para evitar un error en esta prueba debido a los espacios en blanco, se utiliza una expresión regular.
+- Para la prueba de confirmación de la cuenta, se omite el token que se generó como parte del registro y genera otro directamente a partir de la instancia `User`.
+- Para la prueba en la que el usuario hace clic en la URL del token de confirmación recibido por correo electrónico, se envía una petición `GET` a la URL de confirmación, que incluye el token. La respuesta a esta petición es una redirección a la página de inicio.
+- Finalmente, se envia una petición `GET` a la ruta de cierre de sesión; para confirmar que ha funcionado, la prueba busca el mensaje flash en la respuesta.
+
+### Probando Servicios Web
+
+```python
+# tests/test_api.py
+import unittest
+import json
+import re
+from base64 import b64encode
+from app import create_app, db
+from app.models import User, Role, Post, Comment
+
+
+class APITestCase(unittest.TestCase):
+    def setUp(self):
+        self.app = create_app('testing')
+        self.app_context = self.app.app_context()
+        self.app_context.push()
+        db.create_all()
+        Role.insert_roles()
+        self.client = self.app.test_client()
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        self.app_context.pop()
+
+    def get_api_headers(self, username, password):
+        return {
+            'Authorization': 'Basic ' + b64encode(
+                (username + ':' + password).encode('utf-8')).decode('utf-8'),
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+
+    def test_no_auth(self):
+        response = self.client.get('/api/v1/posts/',
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 401)
+
+    def test_posts(self):
+        # add a user
+        r = Role.query.filter_by(name='User').first()
+        self.assertIsNotNone(r)
+        u = User(email='john@example.com', password='cat', confirmed=True,
+                    role=r)
+        db.session.add(u)
+        db.session.commit()
+
+        # write an empty post
+        response = self.client.post(
+            '/api/v1/posts/',
+            headers=self.get_api_headers('john@example.com', 'cat'),
+            data=json.dumps({'body': ''}))
+        self.assertEqual(response.status_code, 400)
+
+        # write a post
+        response = self.client.post(
+            '/api/v1/posts/',
+            headers=self.get_api_headers('john@example.com', 'cat'),
+            data=json.dumps({'body': 'body of the *blog* post'}))
+        self.assertEqual(response.status_code, 201)
+        url = response.headers.get('Location')
+        self.assertIsNotNone(url)
+
+        # get the new post
+        response = self.client.get(
+            url,
+            headers=self.get_api_headers('john@example.com', 'cat'))
+        self.assertEqual(response.status_code, 200)
+        json_response = json.loads(response.get_data(as_text=True))
+        self.assertEqual('http://localhost' + json_response['url'], url)
+        self.assertEqual(json_response['body'], 'body of the *blog* post')
+        self.assertEqual(json_response['body_html'],
+                        '<p>body of the <em>blog</em> post</p>')
+        json_post = json_response
+```
+- `get_api_headers()` es un método helper que devuelve las cabeceras comunes que necesitan ser enviadas con la mayoría de las peticiones API. 
+- `test_no_auth()` es una prueba sencilla que garantiza que una solicitud que no incluya credenciales de autenticación se rechace con el código de error 401. 
+- `test_posts()` añade un usuario a la base de datos y luego utiliza la API RESTful para insertar una entrada de blog y luego leerla de vuelta. 
+- Cualquier petición que envíe datos en el cuerpo debe codificarlos con `json.dumps()`, porque el cliente de prueba Flask no codifica automáticamente a JSON. 
+
+
+## Pruebas integrales con Selenium
+El cliente de prueba de Flask no puede emular completamente el entorno de una aplicación en ejecución. Cuando las pruebas requieren el entorno completo, no hay más remedio que utilizar un navegador web real conectado a la aplicación que se ejecuta en un servidor web real. **Selenium** es una herramienta de automatización de navegadores web compatible con los navegadores más populares de los tres principales sistemas operativos.
+```bash
+(venv) $ pip install selenium
+```
+
+Selenium requiere que se instale por separado un controlador para el navegador web deseado, además del propio navegador.
+```bash
+(venv) $ brew install chromedriver
+```
+
 
 
 
