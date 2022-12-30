@@ -260,7 +260,34 @@ Selenium requiere que se instale por separado un controlador para el navegador w
 (venv) $ brew install chromedriver
 ```
 
+Realizar pruebas con Selenium requiere que la aplicación se esté ejecutando dentro de un servidor web que esté escuchando peticiones HTTP reales. Bajo el control de las pruebas, Selenium lanza un navegador web y hace que se conecte a la aplicación para realizar las operaciones requeridas.
 
+Un problema con este enfoque es que después de que todas las pruebas se han completado, el servidor Flask necesita ser detenido, idealmente de una manera elegante, para que las tareas en segundo plano, como el motor de cobertura de código puedan terminar limpiamente su trabajo. El servidor web Werkzeug tiene una opción de apagado, pero debido a que el servidor se ejecuta aislado en su propio hilo, la única manera de pedir al servidor que se apague es mediante el envío de una solicitud HTTP regular.
+```python
+# app/main/views.py
+@main.route('/shutdown')
+def server_shutdown():
+    if not current_app.testing:
+        abort(404)
+    shutdown = request.environ.get('werkzeug.server.shutdown')
+    if not shutdown:
+        abort(500)
+    shutdown()
+    return 'Shutting down...'
+```
 
+[Aquí](https://github.com/paolarocha-cbpi/flasky/blob/main/tests/test_selenium.py) se encuentra el código de las diferentes pruebas unitarias realizadas con Selenium. De lo cual, podemos rescatar que:
+- Los métodos `setUpClass()` y `tearDownClass()` se invocan antes y después de que se ejecuten las pruebas de esta clase.
+- La configuración implica iniciar una instancia de Chrome a través de la API webdriver de Selenium, y crear una aplicación y una base de datos con algunos datos falsos iniciales para que las pruebas los utilicen.
+- La aplicación se inicia en un hilo utilizando el método `app.run()`. 
+- Al final la aplicación recibe una petición a `/shutdown`, que hace que el hilo de fondo termine.
+- Cuando se realizan pruebas con Selenium, las pruebas envían comandos al navegador web y nunca interactúan con la aplicación directamente. Es decir, **los comandos están relacionados con las acciones que hace un usuario real con su teclado y mouse**.
+    - Por ejemplo, para ir a la página de inicio de sesión, la prueba busca el enlace "Iniciar sesión" utilizando `find_element_by_link_text()` y luego llama a `click()` sobre él para provocar un clic real en el navegador
 
+## ¿Vale la pena?
 
+Las pruebas de extremo a extremo del tipo que el cliente de pruebas Flask y Selenium pueden llevar a cabo son a veces necesarias, pero debido a la mayor complejidad de escribirlas, deberían utilizarse sólo para funcionalidades que no puedan probarse de forma aislada.
+
+El código que existe en las funciones de vista debe ser simple y sólo actuar como una capa delgada que acepta peticiones e invoca las acciones correspondientes en otras clases o funciones que encapsulan la lógica de la aplicación.
+
+Así que sí, las pruebas merecen la pena. Pero es importante diseñar una estrategia de pruebas eficiente y escribir código que pueda aprovecharla.
