@@ -60,4 +60,11 @@ def profile(length, profile_dir):
     from werkzeug.middleware.profiler import ProfilerMiddleware
     app.wsgi_app = ProfilerMiddleware(app.wsgi_app, restrictions=[length],
                                     profile_dir=profile_dir)
+    # del os.environ["FLASK_RUN_FROM_CLI"]
+    app.run(debug=False)
+
+if __name__ == "__main__":
+    from werkzeug.middleware.profiler import ProfilerMiddleware
+    app.wsgi_app = ProfilerMiddleware(app.wsgi_app, restrictions=[3],
+                                    profile_dir=None)
     app.run(debug=False)

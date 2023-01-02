@@ -56,3 +56,17 @@ def profile(length, profile_dir):
 - Este comando adjunta el `ProfilerMiddleware` de Werkzeug a la aplicación, a través de su atributo `wsgi_app`.
 - Cuando se inicia la aplicación con el perfil flask, la consola mostrará las estadísticas del profiler para cada petición, que incluirán las 25 funciones más lentas.
 
+ACTUALIZACIÓN:
+La opción de hacer personalizado el comando 'run' de Flask con el perfilado de código no se encuentra disponible. Una forma de solucionarlo es la siguiente:
+```python
+# flasky.py
+if __name__ == "__main__":
+    from werkzeug.middleware.profiler import ProfilerMiddleware
+    app.wsgi_app = ProfilerMiddleware(app.wsgi_app, restrictions=[3],
+                                    profile_dir=None)
+    app.run(debug=False)
+```
+Para ejecutar el programa es:
+```bash
+(venv) $ python flasky.py
+```

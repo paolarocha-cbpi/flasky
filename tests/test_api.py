@@ -64,7 +64,7 @@ class APITestCase(unittest.TestCase):
             headers=self.get_api_headers('john@example.com', 'cat'))
         self.assertEqual(response.status_code, 200)
         json_response = json.loads(response.get_data(as_text=True))
-        self.assertEqual('http://localhost' + json_response['url'], url)
+        self.assertEqual(json_response['url'], url)
         self.assertEqual(json_response['body'], 'body of the *blog* post')
         self.assertEqual(json_response['body_html'],
                         '<p>body of the <em>blog</em> post</p>')
@@ -97,6 +97,6 @@ class APITestCase(unittest.TestCase):
             data=json.dumps({'body': 'updated body'}))
         self.assertEqual(response.status_code, 200)
         json_response = json.loads(response.get_data(as_text=True))
-        self.assertEqual('http://localhost' + json_response['url'], url)
+        self.assertEqual(json_response['url'], url)
         self.assertEqual(json_response['body'], 'updated body')
         self.assertEqual(json_response['body_html'], '<p>updated body</p>')
